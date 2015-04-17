@@ -1,4 +1,4 @@
-<?php namespace zblues/framework;
+<?php namespace zblues\framework;
 
 class View
 {
@@ -85,8 +85,8 @@ class View
   {
     $config = $this->reg->get('config');
 
-	require_once 'Template_/Template_.class.php';
-    $this->_tpl = new Template_($config['base_dir'] . $config['app_dirname'] . '/' . $config['view_dirname']);
+	//require_once 'Template_/Template_.class.php';
+    $this->_tpl = new \Template_($config['base_dir'] . $config['app_dirname'] . '/' . $config['view_dirname']);
   }
   
   public function getViewPath()

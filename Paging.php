@@ -1,4 +1,4 @@
-<?php namespace zblues/framework;
+<?php namespace zblues\framework;
 
 class Paging {
 	/* 파라메타용 변수 */

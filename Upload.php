@@ -1,4 +1,4 @@
-<?php namespace zblues/framework;
+<?php namespace zblues\framework;
 
 /*
   $_FILES => 기본: name, type, tmp_name, error, size

@@ -1,4 +1,4 @@
-<?php namespace zblues/framework;
+<?php namespace zblues\framework;
 /**
  * Resize image class will allow you to resize an image
  *

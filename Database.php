@@ -1,4 +1,6 @@
-<?php namespace zblues/framework;
+<?php namespace zblues\framework;
+
+use \PDO;
 
 class Database extends PDO
 {

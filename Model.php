@@ -1,4 +1,4 @@
-<?php namespace zblues/framework;
+<?php namespace zblues\framework;
 
 class Model
 {
