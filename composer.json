@@ -1,0 +1,24 @@
+{
+    "name": "zblues/framework",
+    "description": "PHP Framework",
+    "license": "MIT",
+    "homepage": "http://zblues.arttei.com",
+    "support": {
+        "issues": "https://github.com/zblues/framework/issues",
+        "source": "https://github.com/zblues/framework"
+    },
+    "authors": [
+        {
+            "name": "Sanghoon Youn",
+            "email": "sanghoon.youn@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "zblues\\framework\\": ""
+        }
+    }
+}
