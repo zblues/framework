@@ -349,7 +349,8 @@ EOS;
     unset($filename[count($filename)-1]); 
     $filename = substr( implode(".", $filename), 0, 96 - strlen($prefix)); //파일명 크기 제한
     
-    return $filename . $prefix . '.' . $ext;
+    $thumbnailPath = $filename . $prefix . '.' . $ext;
+	return (file_exists($thumbnailPath)) ? $thumbnailPath : $filePath;
   }
   
   // 
@@ -413,10 +414,10 @@ EOS;
         imagedestroy($img_dest);
     }
     if ($object_file) {
-        if ($type==1) imagegif($img_last, $object_file, 9);
-        else if ($type==2 ) imagejpeg($img_last, $object_file, 9);
-        else if ($type==3 ) imagepng($img_last, $object_file, 9);
-        else if ($type==15) imagewbmp($img_last, $object_file, 9);
+        if ($type==1) imagegif($img_last, $dir . $object_file, 9);
+        else if ($type==2 ) imagejpeg($img_last, $dir . $object_file, 9);
+        else if ($type==3 ) imagepng($img_last, $dir . $object_file, 9);
+        else if ($type==15) imagewbmp($img_last, $dir . $object_file, 9);
     } else {
         if ($type==1) imagegif($img_last);
         else if ($type==2 ) imagejpeg($img_last);
