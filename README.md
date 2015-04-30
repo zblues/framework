@@ -1,4 +1,6 @@
-framework
+[![Build Status]
+
+PHP 프레임웍
 ============
 
 Zblues Framework은 가벼운 PHP 프레임웍을 지향합니다.
