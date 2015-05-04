@@ -1,0 +1,16 @@
+--- Template_.class.php	2015-04-27 15:12:38.000000000 +0900
++++ Template_.class.new.php	2015-04-27 15:28:06.000000000 +0900
+@@ -26,6 +26,13 @@
+ 	var $var_=array(''=>array());
+ 	var $obj_=array();
+ 
++    function __construct($template_dir='../app/views')
++    {
++        $this->template_dir = $template_dir;
++        $this->compile_dir = $template_dir . '/../../data/_compile';
++        $this->cache_dir = $template_dir . '/../../data/_cache';
++    }
++    
+     function define($arg, $path='')
+ 	{
+ 		if ($path) $this->_define($arg, $path);

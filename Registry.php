@@ -10,34 +10,37 @@ class Registry extends Singleton
     {
         foreach($this->_registry as $key => $reg)
             $this->_registry[$key] = null;
-        #Util::msLog(__CLASS__ . " destructed!");
     }
 
-    public function set($key, $func)
+  
+    public static function set($key, $func)
     {
-        $this->_registry[$key] = $func;
+        $r = self::getInstance();
+        $r->_registry[$key] = $func;
     }
 
-    public function get($key)
+    public static function get($key)
     {
-        if(!isset($this->_registry[$key])) return null;
+        $r = self::getInstance();
+        if(!isset($r->_registry[$key])) return null;
 
-        //if(is_callable($this->_registry[$key])) return $this->_registry[$key](self::$instance);
-        if(is_callable($this->_registry[$key])) return $this->_registry[$key]($this);
-        else return $this->_registry[$key];
+        if(is_callable($r->_registry[$key])) return $r->_registry[$key]($r);
+        else return $r->_registry[$key];
     }
-
-    public function setConfigFile($configFilename)
+    
+    public static function setConfigFile($configFilename)
     {
         if(!file_exists($configFilename)) return;
         
-        $this->_configFile = $configFilename;
-        $this->_config = parse_ini_file($configFilename);
+        $r = self::getInstance();
+        $r->_configFile = $configFilename;
+        $r->_config = parse_ini_file($configFilename);
     }
     
-    public function getConfig($key=null)
+    public static function getConfig($key=null)
     {
-        if(empty($key)) return $this->_config;
-        else return isset($this->_config[$key]) ? $this->_config[$key] : null;
+        $r = self::getInstance();
+        if(empty($key)) return $r->_config;
+        else return isset($r->_config[$key]) ? $r->_config[$key] : null;
     }
 }

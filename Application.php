@@ -1,47 +1,54 @@
 <?php namespace zblues\framework;
 
+use Monolog\Logger;
+use Monolog\Handler\StreamHandler;
+
 class Application 
 {
     protected $appName;
-    protected $reg;
-    protected $menu;
-    protected $req;
-    protected $config;
+    protected $log;
     protected $isWebApp;
-    private $_controllerName, $_actionName;
-    private $_controllerFile;
-    private $_controller;
-    private $_errorControllerName = 'error';
-    private $_templates, $_vars = array();
+    private $_controllerObj;
+    private $_defaultDefineTemplate = array();
+    private $_defaultAssignVariable = array();
 
-    public function __construct( $baseAppPath, $appName="app" )
+    public function __construct( $baseAppPath, $appName="app", $isWebApp=false )
     {
-        $this->reg = Registry::getInstance();
-        $this->reg->setConfigFile($baseAppPath . '/config/' . $appName . '.ini');
-        $config = $this->config = $this->reg->getConfig();
+        // Config 설정
+        Registry::setConfigFile($baseAppPath . '/config/' . $appName . '.ini');
+        $config = Registry::getConfig();
+        
+        // Logger 설정 : debug, info, notice, warning, error, critical, alert, emergency
+        $log = new Logger($appName);
+        $log->pushHandler(new StreamHandler($config['base_dir'] . $config['data_dirname'] . '/log/app.log'), Logger::ERROR, false);
             
-        // 백워드 호환지원 : Registry::getInstance()->getConfig()로 대체
-        $this->reg->set('config', function() use ($config) {
+        // Registry::get('config')로도 호출 가능
+        Registry::set('config', function() use ($config) {
             return $config;
         });
+        
+        // Registry::get('log')로 호출 가능
+        Registry::set('log', function() use ($log) {
+            return $log;
+        });
 
-        $this->reg->set('db', function() use ($config) {
+        Registry::set('db', function() use ($config) {
             $db = Database::getInstance();
             $db->connect($config['host'], $config["dbname"], $config["user"], $config["password"]);
             return $db;
         });
 
-        $this->reg->set('session', function() use ($config) {
+        Registry::set('session', function() use ($config) {
             $session = Session::getInstance();
             $session->setLifetime( $config['max_lifetime'] );
             return $session;
         });
 
-        $this->reg->set('auth', function() {
+        Registry::set('auth', function() {
             return Auth::getInstance();
         });
 
-        $this->reg->set('menu', function() use ($config) {
+        Registry::set('menu', function() use ($config) {
             $menu = Menu::getInstance();
             $menu->setMenuFile($config['base_dir'] . $config['app_dirname'] . '/config/menu.php');
             $menu->setDefaultHeadInfo(array(
@@ -51,12 +58,12 @@ class Application
             ));
             return $menu;
         });
-
-        $this->reg->set('req', function() {
-            return Request::getInstance();
+        
+        Registry::set('router', function() {
+            return Router::getInstance();
         });
 
-        $this->reg->set('mail', function() use ($config) {
+        Registry::set('mail', function() use ($config) {
             $mail = Mail::getInstance();
             $mail->setConfig(array(
                 'serverName'=>$config['server_name'], 
@@ -66,124 +73,103 @@ class Application
         });
 
         /*
-        $this->reg->set('message', function() use ($this->reg) {
+        Registry::set('message', function() use ($this->reg) {
             return new Message($this->reg);
         });
         */
 
         $this->appName = $appName;
-        $this->isWebApp = false;
+        $this->isWebApp = $isWebApp;
+        $this->log = $log;
     }
 
     public function __destruct()
     {
-        //$this->reg = null;
-    }
-
-    public function getConfig()
-    {
-        return $this->config;
-    }
-
-    public function getRegistry()
-    {
-        return $this->reg;
+        $this->log = null;
     }
 
     // 웹 응용인 경우 call
     public function prepareWebApp()
     {
-        $this->isWebApp = true;
+        if($this->isWebApp == false) return;
 
-        // User Request 분석
-        $this->req = $this->reg->get('req');
-        #Util::msLog('['. __METHOD__ .']');
-        $this->req->checkUserRequest();
+        // 라우터 콘텍스트 정리
+        $rContext = Registry::get('router')->get($_SERVER['PHP_SELF']);
+        if(empty($rContext) || empty($rContext['controller'])) $rContext['controller'] = 'index';
+        if(empty($rContext) || empty($rContext['action'])) $rContext['action'] = 'index';
+        Registry::set('routerContext', function() use($rContext) { return $rContext; });
 
         // menu 초기화
-        $this->menu = $this->reg->get('menu');
-        $this->menu->setMenuId( $this->req->getControllerName(), $this->req->getActionName() );
+        Registry::get('menu')->setMenuId( Registry::get('routerContext')['controller'], Registry::get('routerContext')['action'] );
+        
+        // controller 로딩
+        $this->_controllerObj = $this->loadController( Registry::get('routerContext')['controller'] );
+        if(empty($this->_controllerObj)) {
+Registry::get('log')->addError('[' . __METHOD__ . '] 콘트롤러가 존재하지 않습니다. => ' . Registry::get('routerContext')['controller']);
+            $this->display('common/layout', array('title'=>'에러', 'msg'=>Registry::get('routerContext')['controller'] . ' 콘트롤러가 존재하지 않습니다.'), array('action' => 'index/error.tpl'));
+            exit;
+        }
+#Util::msLog('[' . __METHOD__ . '] Controller loaded');
+
+        if(!method_exists($this->_controllerObj, Registry::get('routerContext')['action'] . 'Action')) {
+            if(method_exists($this->_controllerObj, 'indexAction')) $this->_controllerObj->indexAction();
+            else {
+                $this->display('common/layout', array('title'=>'에러', 'msg'=> '액션이 존재하지 않습니다. => ' . Registry::get('routerContext')['controller'] . '.' . Registry::get('routerContext')['action']), array('action' => 'index/error.tpl'));
+                //Util::jsAlertAndGo("", "/index/error404?controller=". Registry::get('routerContext')['controller'] . "&action={Registry::get('routerContext')['action']}");
+                return;
+            }
+        } 
     }  
 
     public function run()
     {
-
         if($this->isWebApp) {
-            $this->reg->get('session')->start( $this->reg->get('config')['session_domain'] );
+            Registry::get('session')->start( Registry::get('config')['session_domain'] );
             
-            // 사이트 연동되는 경우 처리
-            // scode : 연동되는 사이트 코드, sname : 사이트명
-            if(!empty($_REQUEST['scode']) && !empty($_REQUEST['sname'])) {
-                $_SESSION['scode'] = base64_decode($_REQUEST['scode']);
-                $_SESSION['sname'] = $_REQUEST['sname'];
-            }
-        }
-#Util::msLog(__METHOD__);
-        // controller 로딩
-        $this->_controller = $this->loadController( $this->req->getControllerName() );
-        if(empty($this->_controller)) {
-Util::msLog('[' . __METHOD__ . '] 심각한 에러 : ' . $this->req->getControllerName());
-            $this->_error('심각한 에러', $this->req->getControllerName() . ' 콘트롤러가 존재하지 않습니다.');
-            exit;
-        }
-#Util::msLog('[' . __METHOD__ . '] Controller loaded');
-        if($this->isWebApp) {
-            $this->_controller->defineTemplate( $this->_templates );
-            //$this->_controller->assignVariable( $this->_vars );
-            $this->_controller->assignVariable( array_merge($this->_vars, array(
-                'topMenu' => $this->menu->getMenu(),
-                'tmid' => $this->menu->getTopMenuId(),
-                'smid' => $this->menu->getSubMenuId(),
-                'head' => $this->menu->getHeadInfo(),
-                'controllerName' => $this->req->getControllerName(),
-                'actionName' => $this->req->getActionName()
-            )));
+            $this->prepareWebApp();
+            $this->_controllerObj->defineTemplate( $this->_defaultDefineTemplate );
+            $this->_controllerObj->assignVariable( $this->_defaultAssignVariable );
         }
 
-        if(method_exists($this->_controller, $this->req->getActionName() . 'Action')) {
-#Util::msLog('[' . __METHOD__ . '] Call action : ' . $this->req->getActionName());
-            $this->_controller->{$this->req->getActionName() . 'Action'}();
-        } else {
-            if(method_exists($this->_controller, 'indexAction')) $this->_controller->indexAction();
-            else {
-                Util::jsAlertAndGo("", "/index/error404?controller=".$this->req->getControllerName() . "&action={$this->req->getActionName()}");
-                return;
-            }
-        } 
+        $this->_controllerObj->{Registry::get('routerContext')['action'] . 'Action'}();
     }
 
     // 공용으로 사용하는 템플릿 파일 정의  
-    public function defineTemplate($templates)
+    public function setDefineTemplate($templates)
     {
-        $this->_templates = $templates;
+        if(empty($templates) || !is_array($templates)) return;
+        $this->_defaultDefineTemplate = $templates;
     }
 
     // 공용으로 사용하는 템플릿 파일 정의  
-    public function assignVariable($vars)
+    public function setAssignVariable($vars)
     {
-        $this->_vars = $vars;
+        if(empty($vars) || !is_array($vars)) return;
+        $this->_defaultAssignVariable = $vars;
     }
-
+    
+/* 사용하지 않으면 삭제할 것
     public function getControllerFile($name)
     {
-        return $this->config['base_dir'] . $this->config['app_dirname'] . '/' . $this->config['controller_dirname'] . '/' . $name . 'Controller.php';
+        $c = Registry::get('config');
+        return $c['base_dir'] . $c['app_dirname'] . '/' . $c['controller_dirname'] . '/' . $name . 'Controller.php';
     }
-
+*/
     public function loadController($name)
     {
 #Util::msLog('['. __METHOD__ .']');
         $controllerClassName = $name . 'Controller';
         if(class_exists($controllerClassName))
-            return new $controllerClassName();
+            return new $controllerClassName($name, new View);
         else return null; //new defaultController();
     }
 
-    private function _error($title, $msg)
+    // $viewFile = 'common/error'
+    private function display($viewFile, $assignParams=array(), $defineParams=array())
     {
-        /* $this->_controller = $this->loadController($this->_errorControllerName);
-    $this->_controller->indexAction($title, $msg); */
-        
-        $view = new View('error/fatal', array('title'=>$title, 'msg'=>$msg));
-        $view->display();
+        $view = new View($viewFile, $assignParams, $defineParams);
+        $view->define( $this->_defaultDefineTemplate );
+        $view->assign( $this->_defaultAssignVariable );
+        $view->render($viewFile);
     }
 }

@@ -8,14 +8,15 @@ class Controller
   public $view;
   protected $model;
   
-  function __construct()
+  // @parameter string name: 예) indexController인 경우 : index
+  function __construct($name, $view)
   {
     $this->reg = Registry::getInstance();
-    $this->auth = $this->reg->get('auth');
-    $this->config = $this->reg->get('config');
-#Util::msLog('['. __METHOD__ .'] ' . $this->_getCallerDir());
-    $this->view = new View();
-    $this->model = Model::loadModel( $this->reg->get('req')->getControllerName() );
+    $this->auth = Registry::get('auth');
+    $this->config = Registry::get('config');
+
+    $this->view = $view;
+    $this->model = Model::loadModel( $name );
   }
   
   function __destruct()
